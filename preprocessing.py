@@ -30,7 +30,7 @@ def gaussianBlur(images):
     blurredImages=[]
     for image in images:
         kernel_size = (5, 5)
-        sigma_x = 1
+        sigma_x = 3
         blurredImage = cv2.GaussianBlur(image, kernel_size, sigma_x)
         blurredImages.append(blurredImage)
 
@@ -91,15 +91,31 @@ def erode(images):
       sharpenedImages.append(dilate)
     return sharpenedImages
 
-def contour(pureImages,processedImages):
-
-    contouredImages = []
-    number=0
+def contour(pureImages, processedImages):
+    contourAjah = []
+    number = 0
     for image in processedImages:
         contours, hierarchy = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-        cv2.drawContours(pureImages[number], contours, -1, (0,0,255), 3)
-        number+=1
+        if contours:
+            # Buat gambar kosong untuk menampilkan kotak pembatas
+            kosongan = np.zeros_like(pureImages[number])
+
+            # Temukan kontur terbesar
+            largestContour = max(contours, key=cv2.contourArea)
+
+            # Dapatkan kotak pembatas dari kontur terbesar
+            x, y, w, h = cv2.boundingRect(largestContour)
+
+            # Gambar kotak pembatas pada citra asli dan citra kosongan
+            cv2.rectangle(pureImages[number], (x, y), (x + w, y + h), (255, 255, 255), 3)
+            cv2.rectangle(kosongan, (x, y), (x + w, y + h), (255, 255, 255), 3)
+
+            # Tambahkan citra kosongan dengan kotak pembatas ke dalam daftar
+            contourAjah.append(kosongan)
+        number += 1
+    return contourAjah
+
 
 def handler(imageFolders):
     #import image
@@ -109,6 +125,11 @@ def handler(imageFolders):
     processingImages= pureImages
     #blur image
     bluredImages= gaussianBlur(processingImages)
+    bluredImages= gaussianBlur(bluredImages)
+    bluredImages= gaussianBlur(bluredImages)
+    bluredImages= gaussianBlur(bluredImages)
+    bluredImages= gaussianBlur(bluredImages)
+    bluredImages= gaussianBlur(bluredImages)
     
     #adaptiveThresholded
     thresholdedImages=adaptiveThreshold(bluredImages)
@@ -120,3 +141,21 @@ def handler(imageFolders):
     #erode
     erodedImages=erode(dilatedImages)
     #getCOntour
+    kuntur=contour(pureImages,erodedImages)
+
+    dilatedKuntur=dilation(kuntur)
+
+    desired_size = (300, 200)
+
+    # Lakukan resizing menggunakan cv2.resize
+    resized_image = cv2.resize(dilatedKuntur[11], desired_size)
+    
+    cv2.imshow('Image', resized_image)
+
+    # Tunggu hingga pengguna menekan tombol apa pun (0 menandakan bahwa kita menunggu waktu tak terbatas)
+    cv2.waitKey(0)
+
+    # Tutup jendela setelah tombol ditekan
+    cv2.destroyAllWindows()
+
+handler("Dataset")
