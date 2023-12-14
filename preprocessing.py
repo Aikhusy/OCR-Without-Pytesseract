@@ -177,7 +177,39 @@ def erode(images):
       sharpenedImages.append(dilate)
     return sharpenedImages
 
-def contour(pureImages, processedImages):
+import cv2
+
+import cv2
+import numpy as np
+
+def contour(pureImages, images):
+    contourr = []
+    number = 0
+    for image in images:
+        contours, hierarchy = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        img_with_contours = np.copy(pureImages[number])
+
+
+        mx = (0,0,0,0)      # biggest bounding box so far
+        mx_area = 0
+        for cont in contours:
+            x,y,w,h = cv2.boundingRect(cont)
+            area = w*h
+            if area > mx_area:
+                mx = x,y,w,h
+                mx_area = area
+        x,y,w,h = mx
+        croped=img_with_contours[y:y+h,x:x+w]
+        # Draw contours on the copy of the original image
+        contourr.append(croped)
+
+        number += 1
+
+    return contourr
+
+
+
+def biggestContour(pureImages, processedImages):
     contourAjah = []
     number = 0
     for image in processedImages:
@@ -266,16 +298,6 @@ def display_images(images, titles):
     cv2.destroyAllWindows()
 
 def resize_image(image, size=(200, 200)):
-    """
-    Resize an image to the specified size.
-
-    Parameters:
-    - image: The input image to be resized.
-    - size: A tuple representing the desired size (width, height).
-
-    Returns:
-    - Resized image.
-    """
     return cv2.resize(image, size)
 
 def displayImages(images, titles):
@@ -366,16 +388,19 @@ def handler3(path):
 
     blured=gaussianBlur(grayed)
 
-    canny=cannyEdgeDetect(blured,50,100)
+    canny=cannyEdgeDetect(blured,30,50)
 
-    erosi=erode(canny)
+    erosi=dilation(canny)
 
-    kuntur=contour(pureImages,erosi)
+    opens=opening(erosi)
+    opens=opening(opens)
 
-    number=10
+    kuntur=contour(pureImages,opens)
 
-    images_to_display = [pureImages[number], grayed[number], blured[number], erosi[number],canny[number],kuntur[number]]
-    titles = ['Pure Image', 'Gray', 'Blurred','eroded','canny',"kuntur"]
+    number=17
+
+    images_to_display = [pureImages[number], grayed[number], blured[number], erosi[number],canny[number],opens[number],kuntur[number]]
+    titles = ['Pure Image', 'Gray', 'Blurred','eroded','canny','opens','kuntur']
 
     displayImages(images_to_display,titles)
     
