@@ -3,7 +3,8 @@ import glob
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-
+import imutils
+from imutils.contours import sort_contours
 
 def pathProcessing (path):
     image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.gif']  # Add more extensions if needed
@@ -113,6 +114,20 @@ def emboss(images):
         embossed.append(convolved_image)
     return embossed
 
+def sharpen(images):
+    sharpened_images = []
+    for image in images:
+        kernel = np.array([[0, -1, 0],
+                           [-1,  5, -1],
+                           [0, -1, 0]])
+
+        # Assuming image is a NumPy array
+        convolved_image = cv2.filter2D(image, -1, kernel)
+
+        sharpened_images.append(convolved_image)
+
+    return sharpened_images
+
 def topHat(images):
     topHatImages = []
 
@@ -207,7 +222,12 @@ def contour(pureImages, images):
 
     return contourr
 
-
+def invert(images):
+    inverted_images = []
+    for image in images:
+        inverted_image = 255 - image
+        inverted_images.append(inverted_image)
+    return inverted_images
 
 def biggestContour(pureImages, processedImages):
     contourAjah = []
@@ -326,57 +346,34 @@ def displayImages(images, titles):
 
     plt.show()
 
-def handler(imageFolders):
-    #import image
-    readyPaths= pathProcessing(imageFolders)
-    pureImages= readImage(readyPaths)
-    
-    processingImages= pureImages
-    #blur image
-    bluredImages= emboss(processingImages)
+def findContours(img):
+    conts = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    conts = imutils.grab_contours(conts)
+    conts = sort_contours(conts, method='left-to-right')[0]
 
-    #adaptiveThresholded
-    segmented= adaptiveThreshold(bluredImages)
-    #erode
-    opened= opening(segmented)
+    return conts
 
-    #getCOntour
-    kuntur=contour(pureImages,opened)
+def kunturisasi(images):
+    terbaca=[]
+    for image in images:
+        show=[]
+        kuntul=findContours(image)
+        min_w, max_w = 30, 160
+        min_h, max_h = 34, 140
+        img_copy = image.copy() # original image for plotting countour result
+        filtered_conts = []
 
-    dilatedKuntur=dilation(kuntur)
-    number=5
+        for c in kuntul:
+            (x, y, w, h) = cv2.boundingRect(c) # find bounding box based on contour
+            if(w >= min_w and w <= max_w) and (h >= min_h and h <= max_h): # if pixel follow this rule, it consider as char
+                filtered_conts.append(c)
+                roi = image[y:y+h, x:x+w] # get region of interest for char
+                thresh = cv2.threshold(roi, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+                show.append(thresh) # check
 
-    # Lakukan resizing menggunakan cv2.resize
-    images_to_display = [pureImages[number], bluredImages[number], segmented[number], opened[number], dilatedKuntur[number]]
-    titles = ['Pure Image', 'Blurred Image', 'Segmented Image', 'Opened Image', 'Dilated Contour']
-
-    display_images(images_to_display,titles)
-    
-
-def handler2(path):
-
-    processed= pathProcessing(path)
-
-    pureImages=readImage(processed)
-
-    grayedImages= grayImages(pureImages)
-
-    bright= brighten_image(grayedImages)
-
-    blurredImages=gaussianBlur(bright)
-
-    edged= cannyEdgeDetect(blurredImages,50,100)
-
-
-    number=5
-
-    # Lakukan resizing menggunakan cv2.resize
-    images_to_display = [pureImages[number], grayedImages[number], blurredImages[number], edged[number], bright[number]]
-    titles = ['Pure Image', 'Blurred Image', 'Segmented Image', 'Opened Image', 'Dilated Contour']
-
-    display_images(images_to_display,titles)
-
-
+                # Build bounding box on original image
+                cv2.rectangle(img_copy, (x,y), (x+w, y+h), (255,0,0), 2)
+                gettingShit(show)
 def handler3(path):
     processed= pathProcessing(path)
 
@@ -402,7 +399,29 @@ def handler3(path):
     images_to_display = [pureImages[number], grayed[number], blured[number], erosi[number],canny[number],opens[number],kuntur[number]]
     titles = ['Pure Image', 'Gray', 'Blurred','eroded','canny','opens','kuntur']
 
-    displayImages(images_to_display,titles)
+    return kuntur
     
 
-handler3('Dataset')
+
+def gettingShit(kuntur):
+    display=[]
+    titel=[]
+    number=1
+
+    for images in kuntur:
+        display.append(images)
+        titel.append(str(number))
+        number+=1
+    displayImages(display,titel)
+
+def postCropProcessing(images):
+    gray=grayImages(images)
+    sharpenedImages=sharpen(gray)
+    thresholding=adaptiveThreshold(sharpenedImages)
+    invertion =invert(thresholding)
+    erosi=erode(invertion)
+    isinya=[erosi[2]]
+    kunturisasi(isinya)
+
+cropped=handler3('Dataset')
+postCropProcessing(cropped)
