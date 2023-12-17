@@ -425,3 +425,117 @@ def postCropProcessing(images):
 
 cropped=handler3('Dataset')
 postCropProcessing(cropped)
+##
+
+def find_contours(img):
+    conts = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    conts = imutils.grab_contours(conts)
+    conts = sort_contours(conts, method='left-to-right')[0]
+
+    return conts
+
+def extract_roi(img, margin=2):
+    roi = img[y - margin:y+h, x - margin:x + w + margin]
+    return roi
+
+def thresholding(img):
+    thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+    print(thresh)
+    return thresh
+
+def resize_img(img, w, h):
+    if w > h:
+        resized = imutils.resize(img, width=28)
+    else:
+        resized = imutils.resize(img, height=28)
+
+    # (w, h) = resized.shape
+    (h, w) = resized.shape
+
+    # Calculate how many pixels need to fill char image
+    dX = int(max(0, 28 - w) / 2.0)
+    dY = int(max(0, 28 - h) / 2.0)
+
+    filled = cv2.copyMakeBorder(resized, top=dY, bottom=dY, right=dX, left=dX, borderType=cv2.BORDER_CONSTANT, value=(0,0,0))
+    filled = cv2.resize(filled, (28,28))
+
+    return filled
+
+def normalization(img):
+    img = img.astype('float32') / 255.0 # convert to floating point
+    img = np.expand_dims(img, axis=-1) # add depth
+    return img
+
+def process_box(gray, x, y, w, h):
+
+    roi = extract_roi(gray)
+    thresh = thresholding(roi)
+    (h, w) = thresh.shape
+    resized = resize_img(thresh, w, h)
+
+    normalized = normalization(resized)
+
+    return (normalized, (x, y, w, h))
+
+def terakhir(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (3,3), 0)
+    adaptive = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 1)
+    invertion = 255 - adaptive
+    erode = cv2.erode(invertion, np.ones((1,1)))
+    conts = find_contours(erode.copy())
+
+    min_w, max_w = 30, 160
+    min_h, max_h = 34, 140
+    img_copy = img.copy() # original image for plotting countour result
+    filtered_conts = []
+
+    for c in conts:
+        (x, y, w, h) = cv2.boundingRect(c) # find bounding box based on contour
+        if(w >= min_w and w <= max_w) and (h >= min_h and h <= max_h): # if pixel follow this rule, it consider as char
+            filtered_conts.append(c)
+            roi = gray[y:y+h, x:x+w] # get region of interest for char
+            thresh = cv2.threshold(roi, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1] # check
+
+            # Build bounding box on original image
+            cv2.rectangle(img_copy, (x,y), (x+w, y+h), (255,0,0), 2)
+    
+    detected_char = []
+
+    for c in conts:
+        (x, y, w, h ) = cv2.boundingRect(c)
+
+        min_w, max_w = 30, 160
+        min_h, max_h = 34, 140
+
+        if(w >= min_w and w <= max_w) and (h >= min_h and h <= max_h):
+            detected_char.append(process_box(gray, x, y, w, h))
+
+    pixels = np.array([px[0] for px in detected_char], dtype='float32')
+
+    # Get all box for detected char
+    boxes = [box[1] for box in detected_char]
+    
+    model = load_model('/content/drive/MyDrive/custom_ocr.model')
+
+    digits = '0123456789'
+    letters = 'ABCDEFGHIJKLMNOPQRSTUVWZYZ'
+    char_list = digits + letters
+    char_list = [ch for ch in char_list]
+
+    preds = model.predict(pixels)
+
+    for p in preds:
+        char_idx = np.argmax(p)
+        print(char_list[char_idx], end = " ")
+    
+    img_copy2 = img.copy()
+
+    for(pred, (x, y, w, h)) in zip(preds, boxes):
+        i = np.argmax(pred)
+        char_detected = char_list[i]
+
+        cv2.rectangle(img_copy2, (x, y), (x+w, y+h), (255,0,0), 2)
+        cv2.putText(img_copy2, char_detected, (x - 10, y - 10), cv2.FONT_HERSHEY_COMPLEX, 1, (0,0,255), 2)
+
+    return img_copy2
